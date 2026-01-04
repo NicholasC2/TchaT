@@ -1,0 +1,55 @@
+.root {
+  	display: flex;
+  	flex-direction: column;
+  	gap: 8px;
+  	padding: 20px;
+  	overflow-y: auto;
+}
+
+.message-input {
+	position: fixed;
+    bottom: 0;
+    left: 0;
+	right: 0;
+	border: none;
+	outline: none;
+	padding: 10px;
+	font-size: 20px;
+	margin: 7px;
+}
+
+.message-input {
+	color: #999;
+}
+
+.message-wrapper {
+  	display: flex;
+  	flex-direction: column;
+  	align-items: flex-start;
+}
+
+#message {
+  	max-width: 70%;
+  	word-wrap: break-word;
+}
+
+.message-wrapper > .title {
+	background-color: #00aeff;
+	font-weight: bold;
+	background-size: 200% 200%;
+  	background-clip: text;
+	color: transparent;
+  	-webkit-background-clip: text;
+  	-webkit-text-fill-color: transparent;
+  	
+	animation: gradient-scroll 3s linear infinite;
+}
+
+@keyframes gradient-scroll {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
