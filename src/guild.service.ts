@@ -1,7 +1,6 @@
-import { Message } from "./message.service.js"
 import path from "node:path";
 import fs from "node:fs";
-import { getAccountByUsername, type Account } from "./account.service.js";
+import { Channel } from "./channel.js";
 
 const GUILD_DIR = "guilds"
 const GUILD_NAME_REGEX = /^[a-zA-Z0-9_ -]+$/;
@@ -10,7 +9,7 @@ const ID_REGEX = /^[a-z0-9_-]+$/;
 export class Guild {
     name: string = "";
     id: string = "";
-    messages: Message[] = [];
+    channels: Channel[] = [];
 
     constructor(name: string) {
         this.setName(name);
@@ -37,13 +36,21 @@ export class Guild {
         return name.trim().toLowerCase().replace(/\s+/g, "-");
     }
 
-    createMessage(content: string, author: Account) {
-        this.messages.push(new Message(content, author))
+    save() {
+        const serializedChannels = this.channels.map(m => m.serialize());
+        fs.writeFileSync(path.join(GUILD_DIR, `${this.id}.json`), JSON.stringify({ ...this, messages: serializedChannels }, null, 4));
     }
 
-    save() {
-        const serializedMessages = this.messages.map(m => m.serialize());
-        fs.writeFileSync(path.join(GUILD_DIR, `${this.id}.json`), JSON.stringify({ ...this, messages: serializedMessages }, null, 4));
+    static load(id: string) {
+        const guildFile = path.join(GUILD_DIR, `${id}.json`);
+        if (fs.existsSync(guildFile)) {
+            const data = JSON.parse(fs.readFileSync(guildFile, "utf-8"));
+            const newGuild = new Guild(data.name);
+            newGuild.setID(data.id);
+            newGuild.channels = (data.channels ?? []).map((c: any) => Channel.deserialize(c));
+            return newGuild;
+        }
+        return null;
     }
 }
 
@@ -75,16 +82,7 @@ export function getGuild(id: string) {
 
     initGuildDir();
 
-    const guildFile = path.join(GUILD_DIR, `${id}.json`);
-    if (fs.existsSync(guildFile)) {
-        const data = JSON.parse(fs.readFileSync(guildFile, "utf-8"));
-        const newGuild = new Guild(data.name);
-        newGuild.setID(data.id);
-        newGuild.messages = (data.messages ?? []).map((m: any) => Message.deserialize(m, getAccountByUsername));
-        return newGuild;
-    }
-
-    return null;
+    return Guild.load(id);
 }
 
 export function updateGuild(guild: Guild, updates: UpdatedGuild) {
