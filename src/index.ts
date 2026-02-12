@@ -1,4 +1,4 @@
-import { createAccount } from "./account.js"
+import { createAccount, getAccount, getPublicAccount, login } from "./account.service.js"
 import Express from "express"
 import cors from "cors"
 
@@ -7,14 +7,45 @@ const app = Express();
 app.use(cors({
     origin: "*"
 }))
+
 app.use(Express.json());
-app.use(Express.static("public/"));
+
+app.get("/account/:user", (req, res) => {
+    const username = req.params.user;
+
+    const account = getPublicAccount(username);
+
+    if (!account) {
+        return res.status(404).json({ error: "User not found" });
+    }
+
+    return res.json(account);
+})
 
 app.post("/account/:action", (req, res) => {
     switch(req.params.action) {
         case "create": {
-            res.json(req.body)
-            
+            try {
+                const {username, password, displayName} = req.body
+                res.json(createAccount(username, password, displayName))
+            } catch(err) {
+                if(err instanceof Error) {
+                    res.json({message: err.message})
+                }
+            }
+
+            break;
+        }
+        case "login": {
+            try {
+                const {username, password} = req.body
+                res.json(login(username, password))
+            } catch(err) {
+                if(err instanceof Error) {
+                    res.json({message: err.message})
+                }
+            }
+
             break;
         }
     }

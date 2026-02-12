@@ -1,3 +1,7 @@
+# node stuff
 node_modules
-accounts
 dist
+
+# server stuff
+accounts
+sessions
