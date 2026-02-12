@@ -1,4 +1,4 @@
-import { createAccount, getAccount, getPublicAccount, login } from "./account.service.js"
+import { createAccount, deleteAccount, getAccount, getPublicAccount, login, updateAccount } from "./account.service.js"
 import Express from "express"
 import cors from "cors"
 
@@ -9,6 +9,10 @@ app.use(cors({
 }))
 
 app.use(Express.json());
+
+app.get("/guild/:id", (req, res) => {
+    
+})
 
 app.get("/account/:user", (req, res) => {
     const username = req.params.user;
@@ -40,6 +44,30 @@ app.post("/account/:action", (req, res) => {
             try {
                 const {username, password} = req.body
                 res.json(login(username, password))
+            } catch(err) {
+                if(err instanceof Error) {
+                    res.json({message: err.message})
+                }
+            }
+
+            break;
+        }
+        case "update": {
+            try {
+                const {sessionID, displayName, password} = req.body
+                res.json(updateAccount(getAccount(sessionID), {displayName, password}))
+            } catch(err) {
+                if(err instanceof Error) {
+                    res.json({message: err.message})
+                }
+            }
+
+            break;
+        }
+        case "delete": {
+            try {
+                const {sessionID} = req.body
+                res.json(deleteAccount(getAccount(sessionID)))
             } catch(err) {
                 if(err instanceof Error) {
                     res.json({message: err.message})

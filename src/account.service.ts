@@ -1,19 +1,75 @@
-import Crypto from "node:crypto"
-import fs from "node:fs";
 import { generateSessionID, deleteSession, getSession } from "./session.service.js"
+import Crypto from "node:crypto"
+import path from "node:path";
+import fs from "node:fs";
+import { getGuild, type Guild } from "./guild.service.js";
 
 const ACCOUNT_DIR = "accounts"
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
+const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{6,}$/;
 
-class Account {
-    username: string;
-    password: string;
-    displayName: string;
+export class Account {
+    username: string = "";
+    password: {
+        value: string;
+        salt: string;
+    };
+    displayName: string = "";
+    guilds: Guild[] = [];
 
-    constructor(username: string, password: Crypto.BinaryLike, displayName: string) {
-        this.username = username;
-        this.password = Crypto.createHash("sha256").update(password).digest("hex")
-        this.displayName = displayName
+    constructor(username: string, hashedPassword: string, salt: string, displayName: string, guildIDs: string[] = []) {
+        this.setUsername(username);
+        this.password = { value:hashedPassword, salt };
+        this.setDisplayName(displayName);
+        
+        this.guilds = guildIDs.map(id => getGuild(id)).filter(Boolean) as Guild[];
+    }
+
+    static create(username: string, password: string, displayName: string) {
+        const newPassword = password.trim();
+        if (newPassword === "" || !PASSWORD_REGEX.test(newPassword)) {
+            throw new Error("Password must contain one letter, one number, and be 6 characters or longer");
+        }
+        const salt = Crypto.randomBytes(16).toString("hex");
+        const hash = Crypto.createHash("sha256").update(salt + password).digest("hex");
+        return new Account(username, hash, salt, displayName);
+    }
+
+    setPassword(password: string) {
+        const newPassword = password.trim();
+        if (newPassword === "" || !PASSWORD_REGEX.test(newPassword)) {
+            throw new Error("Password must contain one letter, one number, and be 6 characters or longer");
+        }
+        const salt = Crypto.randomBytes(16).toString("hex");
+        const hash = Crypto.createHash("sha256").update(salt + newPassword).digest("hex");
+        this.password = { value: hash, salt };
+    }
+
+    setUsername(username: string) {
+        const newUsername = username.trim();
+        if (newUsername === "" || !USERNAME_REGEX.test(newUsername)) {
+            throw new Error("Username cannot contain spaces or special characters");
+        }
+        this.username = newUsername;
+    }
+
+    setDisplayName(displayName: string) {
+        const newDisplayName = displayName.trim();
+        if (newDisplayName === "") {
+            throw new Error("Display name cannot be blank");
+        }
+        this.displayName = newDisplayName;
+    }
+    
+    verifyPassword(password: string) {
+        const hash = Crypto.createHash("sha256").update(this.password.salt + password).digest("hex");
+        return hash === this.password.value;
+    }
+
+    save() {
+        if (!fs.existsSync(ACCOUNT_DIR)) fs.mkdirSync(ACCOUNT_DIR);
+        const guildIDs = this.guilds.map(g => g.id);
+        fs.writeFileSync(path.join(ACCOUNT_DIR, `${this.username}.json`), JSON.stringify({ ...this, guilds: guildIDs }, null, 4));
     }
 }
 
@@ -27,53 +83,38 @@ type UpdatedAccount = Partial<{
     displayName: string;
 }>;
 
-function initAccountDir() {
-    if(!fs.existsSync(ACCOUNT_DIR)) fs.mkdirSync(ACCOUNT_DIR);
-}
-
-function updateAccountFile(account: Account) {
-    fs.writeFileSync(`${ACCOUNT_DIR}/${account.username}.json`, JSON.stringify(account, null, 4))
-}
-
 export function createAccount(username: string, password: string, displayName: string) {
-    if(!USERNAME_REGEX.test(username) || username.trim() == "") throw new Error("Invalid username");
-    if(displayName.trim() == "") throw new Error("Invalid display name");
-    
-    initAccountDir();
+    if(getAccountByUsername(username) !== null) throw new Error("Account already exists");
 
-    if(getAccountByUsername(username) != null) throw new Error("Account already exists");
-    const newAccount = new Account(username, password, displayName.trim());
+    const newAccount = Account.create(username, password, displayName);
+    newAccount.save();
 
-    const sessionID = generateSessionID(newAccount.username);
-
-    updateAccountFile(newAccount);
-
-    return sessionID;
+    return generateSessionID(newAccount.username);
 }
 
 export function getAccountByUsername(username: string): Account | null {
-    if(!USERNAME_REGEX.test(username) || username.trim() === "") throw new Error("Invalid username");
+    username = username.trim()
+    if(!USERNAME_REGEX.test(username) || username === "") throw new Error("Invalid username");
 
-    initAccountDir();
-
-    const accountFile = `${ACCOUNT_DIR}/${username}.json`;
+    const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
     if (fs.existsSync(accountFile)) {
-        return JSON.parse(fs.readFileSync(accountFile, "utf-8")) as Account;
+        const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
+        return new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
     }
     return null;
 }
 
 export function getAccount(sessionID: string) {
-    initAccountDir();
-
     const sessionData = getSession(sessionID);
 
     if (!sessionData) {
         throw new Error("Invalid session");
     }
 
-    if(fs.existsSync(`${ACCOUNT_DIR}/${sessionData.username}.json`)) {
-        return JSON.parse(fs.readFileSync(`${ACCOUNT_DIR}/${sessionData.username}.json`, "utf-8")) as Account;
+    const accountFile = path.join(ACCOUNT_DIR, `${sessionData.username}.json`);
+    if(fs.existsSync(accountFile)) {
+        const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
+        return new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
     } else {
         deleteSession(sessionID);
         throw new Error("Invalid session")
@@ -81,17 +122,17 @@ export function getAccount(sessionID: string) {
 }
 
 export function getPublicAccount(username: string): PublicAccount | null {
-    initAccountDir();
-
-    if (!USERNAME_REGEX.test(username)) {
+    username = username.trim()
+    if (username === "" || !USERNAME_REGEX.test(username)) {
         return null;
     }
 
-    const accountFile = `${ACCOUNT_DIR}/${username}.json`;
+    const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
 
     if (fs.existsSync(accountFile)) {
-        const account = JSON.parse(fs.readFileSync(accountFile, "utf-8")) as Account;
-        
+        const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
+        const account = new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
+
         return {
             username: account.username,
             displayName: account.displayName
@@ -102,49 +143,40 @@ export function getPublicAccount(username: string): PublicAccount | null {
 }
 
 export function getAllAccounts() {
-    initAccountDir();
-
     return fs.readdirSync(ACCOUNT_DIR).map(file => file.replace(".json", ""));
 }
 
 export function deleteAccount(account: Account) {
-    if(fs.existsSync(`${ACCOUNT_DIR}/${account.username}.json`)) {
-        fs.unlinkSync(`${ACCOUNT_DIR}/${account.username}.json`)
+    const accountFile = path.join(ACCOUNT_DIR, `${account.username}.json`);
+    if(fs.existsSync(accountFile)) {
+        fs.unlinkSync(accountFile)
     }
 }
 
 export function updateAccount(account: Account, updates: UpdatedAccount) {
-    initAccountDir();
+    if (updates.password) account.setPassword(updates.password);
+    if (updates.displayName) account.setDisplayName(updates.displayName);
 
-    if (updates.password) {
-        account.password = Crypto.createHash("sha256").update(updates.password).digest("hex");
-    }
-
-    if (updates.displayName) {
-        if(updates.displayName.trim() == "") throw new Error("Invalid display name");
-        account.displayName = updates.displayName.trim();
-    }
-
-    updateAccountFile(account);
+    account.save();
     return account;
 }
 
 export function login(username: string, password: string) {
-    initAccountDir();
+    username = username.trim()
+    password = password.trim()
+    if (username === "" || !USERNAME_REGEX.test(username)) {
+        throw new Error("Invalid username or password");
+    }
 
-    if(!fs.existsSync(`${ACCOUNT_DIR}/${username}.json`)) {
+    const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
+    if(!fs.existsSync(accountFile)) {
         throw new Error("Invalid username or password")
     }
 
-    const account = JSON.parse(fs.readFileSync(`${ACCOUNT_DIR}/${username}.json`, "utf-8")) as Account;
+    const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
+    const account = new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
 
-    if(!account) {
-        throw new Error("Invalid username or password")
-    }
-
-    const hashedPassword = Crypto.createHash("sha256").update(password).digest("hex")
-
-    if(hashedPassword != account.password) {
+    if(!account.verifyPassword(password)) {
         throw new Error("Invalid username or password")
     }
 
