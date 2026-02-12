@@ -36,20 +36,39 @@ export class Guild {
         return name.trim().toLowerCase().replace(/\s+/g, "-");
     }
 
+    serialize() {
+        const serializedChannels = this.channels.map(c => c.serialize());
+
+        return {
+            id: this.id,
+            name: this.name,
+            channels: serializedChannels
+        };
+    }
+
+    static deserialize(data: { name: string, id: string, channels: any[] }) {
+        const newGuild = new Guild(data.name);
+        newGuild.setID(data.id);
+        newGuild.channels = (data.channels ?? []).map((c: any) => Channel.deserialize(c));
+            
+        return newGuild;
+    }
+
     save() {
-        const serializedChannels = this.channels.map(m => m.serialize());
-        fs.writeFileSync(path.join(GUILD_DIR, `${this.id}.json`), JSON.stringify({ ...this, messages: serializedChannels }, null, 4));
+        initGuildDir();
+
+        fs.writeFileSync(path.join(GUILD_DIR, `${this.id}.json`), JSON.stringify(this.serialize(), null, 4));
     }
 
     static load(id: string) {
+        initGuildDir();
+
         const guildFile = path.join(GUILD_DIR, `${id}.json`);
+
         if (fs.existsSync(guildFile)) {
-            const data = JSON.parse(fs.readFileSync(guildFile, "utf-8"));
-            const newGuild = new Guild(data.name);
-            newGuild.setID(data.id);
-            newGuild.channels = (data.channels ?? []).map((c: any) => Channel.deserialize(c));
-            return newGuild;
+            return Guild.deserialize(JSON.parse(fs.readFileSync(guildFile, "utf-8")));
         }
+
         return null;
     }
 }
@@ -59,12 +78,10 @@ type UpdatedGuild = Partial<{
 }>;
 
 function initGuildDir() {
-    if(!fs.existsSync(GUILD_DIR)) fs.mkdirSync(GUILD_DIR);
+    if(!fs.existsSync(GUILD_DIR)) fs.mkdirSync(GUILD_DIR, {recursive:true});
 }
 
 export function createGuild(name: string) {
-    initGuildDir();
-
     const guildID = Guild.convertNametoID(name);
 
     if(getGuild(guildID) !== null) throw new Error("Guild already exists");
@@ -80,14 +97,10 @@ export function getGuild(id: string) {
     id = id.trim()
     if(id === "" || !ID_REGEX.test(id)) throw new Error("Invalid ID");
 
-    initGuildDir();
-
     return Guild.load(id);
 }
 
 export function updateGuild(guild: Guild, updates: UpdatedGuild) {
-    initGuildDir();
-
     if (updates.name) guild.setName(updates.name);
 
     guild.save()

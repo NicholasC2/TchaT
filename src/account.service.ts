@@ -2,7 +2,7 @@ import { generateSessionID, deleteSession, getSession } from "./session.service.
 import Crypto from "node:crypto"
 import path from "node:path";
 import fs from "node:fs";
-import { getGuild, type Guild } from "./guild.service.js";
+import { getGuild, Guild } from "./guild.service.js";
 
 const ACCOUNT_DIR = "accounts"
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
@@ -26,13 +26,9 @@ export class Account {
     }
 
     static create(username: string, password: string, displayName: string) {
-        const newPassword = password.trim();
-        if (newPassword === "" || !PASSWORD_REGEX.test(newPassword)) {
-            throw new Error("Password must contain one letter, one number, and be 6 characters or longer");
-        }
-        const salt = Crypto.randomBytes(16).toString("hex");
-        const hash = Crypto.createHash("sha256").update(salt + password).digest("hex");
-        return new Account(username, hash, salt, displayName);
+        const account = new Account(username, "", "", displayName);
+        account.setPassword(password);
+        return account;
     }
 
     setPassword(password: string) {
@@ -41,7 +37,7 @@ export class Account {
             throw new Error("Password must contain one letter, one number, and be 6 characters or longer");
         }
         const salt = Crypto.randomBytes(16).toString("hex");
-        const hash = Crypto.createHash("sha256").update(salt + newPassword).digest("hex");
+        const hash = Account.deriveKey(newPassword, salt);
         this.password = { value: hash, salt };
     }
 
@@ -60,17 +56,57 @@ export class Account {
         }
         this.displayName = newDisplayName;
     }
+
+    private static deriveKey(string: string, salt:string) {
+        return Crypto.pbkdf2Sync( string, salt, 100000, 64, "sha512" ).toString("hex");
+    }
     
     verifyPassword(password: string) {
-        const hash = Crypto.createHash("sha256").update(this.password.salt + password).digest("hex");
-        return hash === this.password.value;
+        const trimmed = password.trim();
+        const hash = Account.deriveKey(trimmed, this.password.salt);
+    
+        return Crypto.timingSafeEqual(
+            Buffer.from(hash, "hex"),
+            Buffer.from(this.password.value, "hex")
+        );
+    }
+
+    
+    serialize() {
+        return {
+            username: this.username,
+            displayName: this.displayName,
+            password: this.password,
+            guildIDs: this.guilds.map(g => g.id)
+        };
+    }
+
+    static deserialize(data: { username: string, displayName: string, password: { value: string, salt: string;}, guildIDs: any[] }) {
+        return new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guildIDs);
     }
 
     save() {
-        if (!fs.existsSync(ACCOUNT_DIR)) fs.mkdirSync(ACCOUNT_DIR);
-        const guildIDs = this.guilds.map(g => g.id);
-        fs.writeFileSync(path.join(ACCOUNT_DIR, `${this.username}.json`), JSON.stringify({ ...this, guilds: guildIDs }, null, 4));
+        initAccountDir();
+    
+        fs.writeFileSync(
+            path.join(ACCOUNT_DIR, `${this.username}.json`),
+            JSON.stringify(this.serialize(), null, 4)
+        );
     }
+
+    static load(username: string) {
+        initAccountDir();
+
+        const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
+
+        if (!fs.existsSync(accountFile)) return null;
+
+        return Account.deserialize(JSON.parse(fs.readFileSync(accountFile).toString()));
+    }
+
+    static readonly DeletedAccount: Account = Object.freeze(
+        new Account("deleted_user", "", "", "Deleted User", [])
+    );
 }
 
 export type PublicAccount = {
@@ -82,6 +118,10 @@ type UpdatedAccount = Partial<{
     password: string;
     displayName: string;
 }>;
+
+function initAccountDir() {
+    if(!fs.existsSync(ACCOUNT_DIR)) fs.mkdirSync(ACCOUNT_DIR, {recursive:true});
+}
 
 export function createAccount(username: string, password: string, displayName: string) {
     if(getAccountByUsername(username) !== null) throw new Error("Account already exists");
@@ -96,12 +136,13 @@ export function getAccountByUsername(username: string): Account | null {
     username = username.trim()
     if(!USERNAME_REGEX.test(username) || username === "") throw new Error("Invalid username");
 
-    const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
-    if (fs.existsSync(accountFile)) {
-        const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
-        return new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
+    const account = Account.load(username);
+    
+    if(account === Account.DeletedAccount) {
+        return null
     }
-    return null;
+
+    return account;
 }
 
 export function getAccount(sessionID: string) {
@@ -111,14 +152,14 @@ export function getAccount(sessionID: string) {
         throw new Error("Invalid session");
     }
 
-    const accountFile = path.join(ACCOUNT_DIR, `${sessionData.username}.json`);
-    if(fs.existsSync(accountFile)) {
-        const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
-        return new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
-    } else {
+    const account = Account.load(sessionData.username);
+
+    if(account === Account.DeletedAccount) {
         deleteSession(sessionID);
         throw new Error("Invalid session")
     }
+    
+    return account;
 }
 
 export function getPublicAccount(username: string): PublicAccount | null {
@@ -127,23 +168,23 @@ export function getPublicAccount(username: string): PublicAccount | null {
         return null;
     }
 
-    const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
+    const account = Account.load(username);
 
-    if (fs.existsSync(accountFile)) {
-        const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
-        const account = new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
-
+    if(account) {
         return {
             username: account.username,
             displayName: account.displayName
         } as PublicAccount;
     }
-    
+
     return null;
 }
 
 export function getAllAccounts() {
-    return fs.readdirSync(ACCOUNT_DIR).map(file => file.replace(".json", ""));
+    initAccountDir();
+    return fs.readdirSync(ACCOUNT_DIR)
+        .filter(file => file.endsWith(".json"))
+        .map(file => file.replace(".json", ""));
 }
 
 export function deleteAccount(account: Account) {

@@ -20,7 +20,7 @@ class Session {
 
 
 function initSessionDir() {
-    if(!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR);
+    if(!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, {recursive:true});
 }
 
 export function getSession(sessionID: string) {
