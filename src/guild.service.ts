@@ -1,6 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { Channel } from "./channel.js";
+import { Account } from "./account.service.js";
 
 const GUILD_DIR = "guilds"
 const GUILD_NAME_REGEX = /^[a-zA-Z0-9_ -]+$/;
@@ -10,6 +11,7 @@ export class Guild {
     name: string = "";
     id: string = "";
     channels: Channel[] = [];
+    accounts: Account[] = [];
 
     constructor(name: string) {
         this.setName(name);
@@ -38,18 +40,23 @@ export class Guild {
 
     serialize() {
         const serializedChannels = this.channels.map(c => c.serialize());
+        const serializedAccounts = this.accounts.map(a => a.username);
 
         return {
             id: this.id,
             name: this.name,
-            channels: serializedChannels
+            channels: serializedChannels,
+            accountUsernames: serializedAccounts
         };
     }
 
-    static deserialize(data: { name: string, id: string, channels: any[] }) {
+    static deserialize(data: { name: string, id: string, channels: any[], accountUsernames: any[] }) {
         const newGuild = new Guild(data.name);
         newGuild.setID(data.id);
         newGuild.channels = (data.channels ?? []).map((c: any) => Channel.deserialize(c));
+        newGuild.accounts = (data.accountUsernames ?? [])
+            .map((a: any) => Account.load(a))
+            .filter((a): a is Account => a !== null);
             
         return newGuild;
     }

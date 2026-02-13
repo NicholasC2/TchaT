@@ -2,7 +2,6 @@ import { generateSessionID, deleteSession, getSession } from "./session.service.
 import Crypto from "node:crypto"
 import path from "node:path";
 import fs from "node:fs";
-import { getGuild, Guild } from "./guild.service.js";
 
 const ACCOUNT_DIR = "accounts"
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
@@ -15,14 +14,11 @@ export class Account {
         salt: string;
     };
     displayName: string = "";
-    guilds: Guild[] = [];
 
-    constructor(username: string, hashedPassword: string, salt: string, displayName: string, guildIDs: string[] = []) {
+    constructor(username: string, hashedPassword: string, salt: string, displayName: string) {
         this.setUsername(username);
         this.password = { value:hashedPassword, salt };
         this.setDisplayName(displayName);
-        
-        this.guilds = guildIDs.map(id => getGuild(id)).filter(Boolean) as Guild[];
     }
 
     static create(username: string, password: string, displayName: string) {
@@ -76,12 +72,11 @@ export class Account {
             username: this.username,
             displayName: this.displayName,
             password: this.password,
-            guildIDs: this.guilds.map(g => g.id)
         };
     }
 
-    static deserialize(data: { username: string, displayName: string, password: { value: string, salt: string;}, guildIDs: any[] }) {
-        return new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guildIDs);
+    static deserialize(data: { username: string, displayName: string, password: { value: string, salt: string;} }) {
+        return new Account(data.username, data.password.value, data.password.salt, data.displayName);
     }
 
     save() {

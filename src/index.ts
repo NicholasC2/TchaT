@@ -1,84 +1,58 @@
-import { createAccount, deleteAccount, getAccount, getPublicAccount, login, updateAccount } from "./account.service.js"
-import Express from "express"
-import cors from "cors"
+import { Server } from "socket.io"
+import { createAccount, login } from "./account.service.js"
 
-const app = Express();
-
-app.use(cors({
-    origin: "*"
-}))
-
-app.use(Express.json());
-
-app.get("/guild/:id", (req, res) => {
-    
-})
-
-app.get("/account/:user", (req, res) => {
-    const username = req.params.user;
-
-    const account = getPublicAccount(username);
-
-    if (!account) {
-        return res.status(404).json({ error: "User not found" });
+const server = new Server({
+    cors: {
+        origin: "*"
     }
-
-    return res.json(account);
 })
 
-app.post("/account/:action", (req, res) => {
-    switch(req.params.action) {
-        case "create": {
-            try {
-                const {username, password, displayName} = req.body
-                res.json(createAccount(username, password, displayName))
-            } catch(err) {
-                if(err instanceof Error) {
-                    res.json({message: err.message})
+server.on("connection", socket => {
+    console.log("Client connected:", socket.id)
+
+    socket.on("message", message => {
+        try {
+            const type = message.type.split("/");
+
+            switch(type[0]) {
+                case "account": {
+                    switch(type[1]) {
+                        case "create": {
+                            try  {
+                                let session = createAccount(message.data.username, message.data.password, message.data.displayName);
+                                socket.emit("message", {type: "account/creation_successful", data: {sessionID: session}})
+                            } catch(err) {
+                                if(err instanceof Error) {
+                                    socket.emit("message", {type: "account/creation_unsuccessful", data: {message: err.message}})
+                                }
+                            }
+                            
+                            break;
+                        }
+                        case "login": {
+                            try  {
+                                let session = login(message.data.username, message.data.password);
+                                socket.emit("message", {type: "account/login_successful", data: {sessionID: session}})
+                            } catch(err) {
+                                if(err instanceof Error) {
+                                    socket.emit("message", {type: "account/login_unsuccessful", data: {message: err.message}})
+                                }
+                            }
+                            
+                            break;
+                        }
+                    }
+
+                    break;
                 }
             }
-
-            break;
-        }
-        case "login": {
-            try {
-                const {username, password} = req.body
-                res.json(login(username, password))
-            } catch(err) {
-                if(err instanceof Error) {
-                    res.json({message: err.message})
-                }
+            
+        } catch(err) {
+            if(err instanceof Error) {
+                socket.emit("error", err.message)
             }
-
-            break;
         }
-        case "update": {
-            try {
-                const {sessionID, displayName, password} = req.body
-                res.json(updateAccount(getAccount(sessionID), {displayName, password}))
-            } catch(err) {
-                if(err instanceof Error) {
-                    res.json({message: err.message})
-                }
-            }
-
-            break;
-        }
-        case "delete": {
-            try {
-                const {sessionID} = req.body
-                res.json(deleteAccount(getAccount(sessionID)))
-            } catch(err) {
-                if(err instanceof Error) {
-                    res.json({message: err.message})
-                }
-            }
-
-            break;
-        }
-    }
-});
-
-app.listen(4000, function() {
-    console.log("Server Listening on port 4000")
+    })
 })
+
+server.listen(443)
