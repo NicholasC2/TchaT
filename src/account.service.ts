@@ -71,7 +71,6 @@ export class Account {
         );
     }
 
-    
     serialize() {
         return {
             username: this.username,
@@ -95,6 +94,9 @@ export class Account {
     }
 
     static load(username: string) {
+        username = username.trim()
+        if(!USERNAME_REGEX.test(username) || username === "") throw new Error("Invalid username");
+
         initAccountDir();
 
         const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
@@ -103,10 +105,6 @@ export class Account {
 
         return Account.deserialize(JSON.parse(fs.readFileSync(accountFile).toString()));
     }
-
-    static readonly DeletedAccount: Account = Object.freeze(
-        new Account("deleted_user", "", "", "Deleted User", [])
-    );
 }
 
 export type PublicAccount = {
@@ -124,25 +122,12 @@ function initAccountDir() {
 }
 
 export function createAccount(username: string, password: string, displayName: string) {
-    if(getAccountByUsername(username) !== null) throw new Error("Account already exists");
+    if(Account.load(username) !== null) throw new Error("Account already exists");
 
     const newAccount = Account.create(username, password, displayName);
     newAccount.save();
 
     return generateSessionID(newAccount.username);
-}
-
-export function getAccountByUsername(username: string): Account | null {
-    username = username.trim()
-    if(!USERNAME_REGEX.test(username) || username === "") throw new Error("Invalid username");
-
-    const account = Account.load(username);
-    
-    if(account === Account.DeletedAccount) {
-        return null
-    }
-
-    return account;
 }
 
 export function getAccount(sessionID: string) {
@@ -154,7 +139,7 @@ export function getAccount(sessionID: string) {
 
     const account = Account.load(sessionData.username);
 
-    if(account === Account.DeletedAccount) {
+    if(account === null) {
         deleteSession(sessionID);
         throw new Error("Invalid session")
     }
@@ -163,11 +148,6 @@ export function getAccount(sessionID: string) {
 }
 
 export function getPublicAccount(username: string): PublicAccount | null {
-    username = username.trim()
-    if (username === "" || !USERNAME_REGEX.test(username)) {
-        return null;
-    }
-
     const account = Account.load(username);
 
     if(account) {
@@ -203,19 +183,12 @@ export function updateAccount(account: Account, updates: UpdatedAccount) {
 }
 
 export function login(username: string, password: string) {
-    username = username.trim()
     password = password.trim()
-    if (username === "" || !USERNAME_REGEX.test(username)) {
-        throw new Error("Invalid username or password");
-    }
+    const account = Account.load(username)
 
-    const accountFile = path.join(ACCOUNT_DIR, `${username}.json`);
-    if(!fs.existsSync(accountFile)) {
-        throw new Error("Invalid username or password")
+    if(!account) {
+        throw new Error("Account doesn't exist")
     }
-
-    const data = JSON.parse(fs.readFileSync(accountFile, "utf-8"));
-    const account = new Account(data.username, data.password.value, data.password.salt, data.displayName, data.guilds);
 
     if(!account.verifyPassword(password)) {
         throw new Error("Invalid username or password")

@@ -1,4 +1,5 @@
 import Crypto from "node:crypto"
+import path from "node:path";
 import fs from "node:fs";
 
 const SESSION_DIR = "sessions"
@@ -16,52 +17,83 @@ class Session {
         this.username = username;
         this.createdAt = createdAt;
     }
-}
 
+    serialize() {
+        return {
+            id: this.id,
+            username: this.username,
+            createdAt: this.createdAt
+        };
+    }
+
+    static deserialize(data: { id: string, username: string, createdAt: number }) {
+        const session = new Session(data.id, data.username, data.createdAt);
+        
+        if(!session) {
+            deleteSession(data.id);
+            throw new Error("Invalid session")
+        }
+        
+        if(!session.username) {
+            deleteSession(data.id);
+            throw new Error("Invalid session")
+        }
+                
+        if(!USERNAME_REGEX.test(session.username) || session.username.trim() == "") {
+            deleteSession(data.id);
+            throw new Error("Invalid session");
+        }
+            
+        if(!session.createdAt || typeof session.createdAt !== "number") {
+            deleteSession(data.id);
+            throw new Error("Invalid session")
+        }
+        
+        if (Date.now() - session.createdAt > MAX_SESSION_AGE) {
+            deleteSession(data.id);
+            throw new Error("Session expired");
+        }
+
+        return session;
+    }
+
+    save() {
+        initSessionDir();
+    
+        fs.writeFileSync(
+            path.join(SESSION_DIR, `${this.id}.json`),
+            JSON.stringify(this.serialize(), null, 4)
+        );
+    }
+
+    static load(id: string) {
+        id = id.trim()
+        if (!UUID_REGEX.test(id)) {
+            throw new Error("Invalid session ID");
+        }
+
+        initSessionDir();
+
+        const accountFile = path.join(SESSION_DIR, `${id}.json`);
+
+        if (!fs.existsSync(accountFile)) return null;
+        
+        try {
+            return Session.deserialize(JSON.parse(fs.readFileSync(accountFile).toString()));
+        } catch {
+            return null;
+        }
+    }
+}
 
 function initSessionDir() {
     if(!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, {recursive:true});
 }
 
 export function getSession(sessionID: string) {
-    if (!UUID_REGEX.test(sessionID)) {
-        return null;
-    }
-
-    const sessionFile = `${SESSION_DIR}/${sessionID}.json`;
-
-    if(fs.existsSync(sessionFile)) {
-        let sessionData;
-        try {
-            sessionData = JSON.parse(fs.readFileSync(sessionFile, "utf-8"));
-        } catch {
-            deleteSession(sessionID);
-            throw new Error("Invalid session");
-        }
+    let sessionData = Session.load(sessionID);  
     
-        if(!sessionData.username) {
-            deleteSession(sessionID);
-            throw new Error("Invalid session")
-        }
-            
-        if(!USERNAME_REGEX.test(sessionData.username) || sessionData.username.trim() == "") {
-            deleteSession(sessionID);
-            throw new Error("Invalid session");
-        }
-        
-        if(!sessionData.createdAt || typeof sessionData.createdAt !== "number") {
-            deleteSession(sessionID);
-            throw new Error("Invalid session")
-        }
-    
-        if (Date.now() - sessionData.createdAt > MAX_SESSION_AGE) {
-            deleteSession(sessionID);
-            throw new Error("Session expired");
-        }        
-    
-        return sessionData as Session;
-    }
-    return null;
+    return sessionData;
 }
 
 export function generateSessionID(username: string): string {

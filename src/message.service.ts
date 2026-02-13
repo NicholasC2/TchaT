@@ -17,7 +17,8 @@ export class Message {
     }
 
     static deserialize(data: { content: string, author: string }, getAccountByUsername: (username: string) => Account | null) {
-        const author = getAccountByUsername(data.author) || Account.DeletedAccount;
+        const author = getAccountByUsername(data.author);
+        if(!author) throw new Error("Invalid Message");
         return new Message(data.content, author);
     }
 }

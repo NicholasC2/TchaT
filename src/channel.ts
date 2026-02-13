@@ -1,4 +1,4 @@
-import { getAccountByUsername } from "./account.service.js";
+import { Account } from "./account.service.js";
 import { Message } from "./message.service.js";
 
 const CHANNEL_NAME_REGEX = /^[a-zA-Z0-9_ -]+$/;
@@ -44,7 +44,7 @@ export class Channel {
 
     static deserialize(data: { name: string, messages: any[] }) {
         const newChannel = new Channel(data.name);
-        newChannel.messages = data.messages.map(m => Message.deserialize(m, getAccountByUsername));
+        newChannel.messages = data.messages.map(m => Message.deserialize(m, Account.load));
         return newChannel;
     }
 }
