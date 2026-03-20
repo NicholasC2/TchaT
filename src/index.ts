@@ -45,6 +45,11 @@ server.on("connection", socket => {
 
                     break;
                 }
+                case "check-valid": {
+                    socket.emit("message", {validTchaT: true});
+                    
+                    break;  
+                }
             }
             
         } catch(err) {
@@ -55,4 +60,4 @@ server.on("connection", socket => {
     })
 })
 
-server.listen(443)
+server.listen(8000)
