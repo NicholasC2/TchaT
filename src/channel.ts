@@ -1,10 +1,10 @@
-import { getAccountByUsername, Account } from "./account.service.js";
+import { getPublicAccount, Account, type PublicAccount } from "./account.service.js";
 
 export class Message {
     content: string;
-    author: Account;
+    author: PublicAccount;
 
-    constructor(content: string, author: Account) {
+    constructor(content: string, author: PublicAccount) {
         this.content = content;
         this.author = author;
     }
@@ -16,8 +16,8 @@ export class Message {
         };
     }
 
-    static deserialize(data: { content: string, author: string }, getAccountByUsername: (username: string) => Account | null) {
-        const author = getAccountByUsername(data.author);
+    static deserialize(data: { content: string, author: string }) {
+        const author = getPublicAccount(data.author);
         if (!author) throw new Error("Author account not found");
         return new Message(data.content, author);
     }
@@ -67,7 +67,7 @@ export class Channel {
 
     static deserialize(data: { name: string, messages: any[] }) {
         const newChannel = new Channel(data.name);
-        newChannel.messages = data.messages.map(m => Message.deserialize(m, Account.load));
+        newChannel.messages = data.messages.map(m => Message.deserialize(m));
         return newChannel;
     }
 }
