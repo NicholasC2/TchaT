@@ -70,4 +70,12 @@ export class Channel {
         newChannel.messages = data.messages.map(m => Message.deserialize(m));
         return newChannel;
     }
+
+    createMessage(content: string, author: PublicAccount) {
+        const message = new Message(content, author);
+
+        if(message) this.messages.push(message);
+
+        return message;
+    }
 }

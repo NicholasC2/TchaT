@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
-import { Channel } from "./channel.js";
-import { Account } from "./account.service.js";
+import { Channel, Message } from "./channel.js";
+import { Account, type PublicAccount } from "./account.service.js";
 
 const GUILD_DIR = "guilds"
 const GUILD_NAME_REGEX = /^[a-zA-Z0-9_ -]+$/;
@@ -78,6 +78,12 @@ export class Guild {
 
         return null;
     }
+    
+    updateGuild(updates: UpdatedGuild) {
+        if (updates.name) this.setName(updates.name);
+
+        this.save()
+    }
 }
 
 type UpdatedGuild = Partial<{
@@ -105,11 +111,4 @@ export function getGuild(id: string) {
     if(id === "" || !ID_REGEX.test(id)) throw new Error("Invalid ID");
 
     return Guild.load(id);
-}
-
-export function updateGuild(guild: Guild, updates: UpdatedGuild) {
-    if (updates.name) guild.setName(updates.name);
-
-    guild.save()
-    return guild;
 }

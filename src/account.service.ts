@@ -142,7 +142,7 @@ export function getAccount(sessionID: string) {
     return account;
 }
 
-export function getPublicAccount(username: string): PublicAccount | null {
+export function getPublicAccount(username: string): PublicAccount {
     const account = Account.load(username);
 
     if(account) {
@@ -152,7 +152,7 @@ export function getPublicAccount(username: string): PublicAccount | null {
         } as PublicAccount;
     }
 
-    return null;
+    throw new Error("Invalid account")
 }
 
 export function getAllAccounts() {
