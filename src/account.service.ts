@@ -54,16 +54,21 @@ export class Account {
     }
 
     private static deriveKey(string: string, salt:string) {
-        return Crypto.pbkdf2Sync( string, salt, 100000, 64, "sha512" ).toString("hex");
+        return Crypto.pbkdf2Sync(string, salt, 600000, 64, "sha512").toString("hex");
     }
     
     verifyPassword(password: string) {
         const trimmed = password.trim();
         const hash = Account.deriveKey(trimmed, this.password.salt);
+
+        const checkHash = Buffer.from(hash, "hex");
+        const passHash = Buffer.from(this.password.value, "hex");
+
+        if(checkHash.length !== passHash.length) throw new Error("Invalid Hash Length");
     
         return Crypto.timingSafeEqual(
-            Buffer.from(hash, "hex"),
-            Buffer.from(this.password.value, "hex")
+            checkHash,
+            passHash
         );
     }
 
