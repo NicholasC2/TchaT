@@ -1,4 +1,4 @@
-import { getPublicAccount, Account, type PublicAccount } from "./TS-Accountd/account.service.js";
+import { getPublicAccount, Account, type PublicAccount } from "./TS-Accountd/account.js";
 
 export class Message {
     content: string;
