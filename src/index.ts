@@ -1,7 +1,7 @@
 import { Server, Socket } from "socket.io"
-import { createAccount, getAccount, getPublicAccount, login } from "./TS-Accountd/account.js"
+import { Account, AccountStore, Session, SessionStore } from "ts-accountd"
 import { Channel, Message } from "./channel.js"
-import { createGuild, getGuild } from "./guild.service.js"
+import { Guild } from "./guild.js"
 
 type ServerMessage =
     | { type: "account/creationSuccessful"; data: { sessionID: string } }
@@ -17,48 +17,56 @@ const server = new Server({
     }
 })
 
+const accStore = new AccountStore();
+const sessionStore = new SessionStore();
+
 const handlers: Record<string, Handler> = {
     "account/create": async (socket, data) => {
-        const session = createAccount(data.username, data.password, data.displayName);
+        const account = await Account.create({username: data.username, password: data.password, displayName: data.displayName});
+        accStore.add(account);
+        let session = sessionStore.create(account.username);
         return { type: "account/creationSuccessful", data: { sessionID: session } };
     },
 
     "account/login": async (socket, data) => {
-        const session = login(data.username, data.password);
+        const session = sessionStore.create(data.username);
         return { type: "account/loginSuccessful", data: { sessionID: session } };
     },
 
-    "guild/create": async (socket, data) => {
-        const guild = createGuild(data.name);
+    // "guild/create": async (socket, data) => {
+    //     const guild = new Guild(data.name);
 
-        if (!guild) throw new Error("Guild Invalid");
+    //     if (!guild) throw new Error("Guild Invalid");
 
-        return { type: "guild/creationSuccessful", data: guild.serialize() };
-    },
+    //     return { type: "guild/creationSuccessful", data: guild.serialize() };
+    // },
 
-    "channel/get": async (socket, data) => {
-        const guild = getGuild(data.guildID);
-        const channel = guild?.channels.find(c => c.id === data.channelID);
+    // "channel/get": async (socket, data) => {
+    //     const guild = getGuild(data.guildID);
+    //     const channel = guild?.channels.find(c => c.id === data.channelID);
 
-        if (!channel) throw new Error("Channel Not Found");
+    //     if (!channel) throw new Error("Channel Not Found");
 
-        return { type: "channel/getSuccessful", data: channel?.serialize() };
-    },
+    //     return { type: "channel/getSuccessful", data: channel?.serialize() };
+    // },
 
-    "channel/sendMessage": async (socket, data) => {
-        const guild = getGuild(data.guildID);
-        const channel = guild?.channels.find(c => c.id === data.channelID);
+    // "channel/sendMessage": async (socket, data) => {
+    //     const guild = getGuild(data.guildID);
+    //     const channel = guild?.channels.find(c => c.id === data.channelID);
 
-        const session = getAccount(data.sessionID);
-        const msg = channel?.createMessage(
-            data.content,
-            getPublicAccount(session.username)
-        );
+    //     const session = sessionStore.get(data.sessionID);
+    //     if(!session) throw new Error("Invalid SessionID");
+    //     const account = accStore.get(session.username);
 
-        if (!msg) throw new Error("Message Invalid");
+    //     const msg = channel?.createMessage(
+    //         data.content,
+    //         account?.getPublicAccount()
+    //     );
 
-        return { type: "channel/sendMessageSuccessful", data: msg?.serialize() };
-    }
+    //     if (!msg) throw new Error("Message Invalid");
+
+    //     return { type: "channel/sendMessageSuccessful", data: msg?.serialize() };
+    // }
 };
 
 server.on("connection", socket => {

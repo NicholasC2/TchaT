@@ -1,32 +1,24 @@
-import { type PublicAccount } from "ts-accountd";
+import { Channel } from "./channel.js";
+import { Account } from "ts-accountd";
 
-export class Message {
-    content: string;
-    author: PublicAccount;
-
-    constructor(content: string, author: PublicAccount) {
-        this.content = content;
-        this.author = author;
-    }
-}
-
-
-const CHANNEL_NAME_REGEX = /^[a-zA-Z0-9_ -]+$/;
+const GUILD_NAME_REGEX = /^[a-zA-Z0-9_ -]+$/;
 const ID_REGEX = /^[a-z0-9_-]+$/;
 
-export class Channel {
+export class Guild {
     name: string = "";
     id: string = "";
-    messages: Message[] = [];
+    channels: Channel[] = [];
+    accounts: Account[] = [];
 
     constructor(name: string) {
         this.setName(name);
+        this.setID(Guild.convertNametoID(name));
     }
 
     setName(name: string) {
         const newName = name.trim();
-        if(newName === "" || !CHANNEL_NAME_REGEX.test(newName)) {
-            throw new Error("Channel name must not contain special characters");
+        if(newName === "" || !GUILD_NAME_REGEX.test(newName)) {
+            throw new Error("Guild name must not contain special characters");
         }
 
         this.name = newName;
@@ -42,9 +34,5 @@ export class Channel {
 
     static convertNametoID(name: string) {
         return name.trim().toLowerCase().replace(/\s+/g, "-");
-    }
-
-    addMessage(message: Message) {
-        this.messages.push(message);
     }
 }
