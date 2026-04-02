@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io"
-import { createAccount, getAccount, getPublicAccount, login } from "./account.service.js"
+import { createAccount, getAccount, getPublicAccount, login } from "./TS-Accountd/account.service.js"
 import { Channel, Message } from "./channel.js"
 import { createGuild, getGuild } from "./guild.service.js"
 

@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import { Channel, Message } from "./channel.js";
-import { Account, type PublicAccount } from "./account.service.js";
+import { Account, type PublicAccount } from "./TS-Accountd/account.service.js";
 
 const GUILD_DIR = "guilds"
 const GUILD_NAME_REGEX = /^[a-zA-Z0-9_ -]+$/;
