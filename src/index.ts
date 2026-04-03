@@ -1,7 +1,15 @@
 import { Server, Socket } from "socket.io"
-import { Account, AccountStore, Session, SessionStore } from "ts-accountd"
-import { Channel, Message } from "./channel.js"
-import { Guild } from "./guild.js"
+import { Account, Session } from "ts-accountd"
+import { Low } from "lowdb"
+import { JSONFile } from "lowdb/node"
+
+type DBSchema = {
+    accounts: Account[]
+    sessions: Session[]
+}
+
+const adapter = new JSONFile<DBSchema>("db.json")
+const db = new Low(adapter, { accounts: [], sessions: [] });
 
 type ServerMessage =
     | { type: "account/creationSuccessful"; data: { sessionID: string } }
@@ -17,20 +25,45 @@ const server = new Server({
     }
 })
 
-const accStore = new AccountStore();
-const sessionStore = new SessionStore();
+async function createSession(username: string): Promise<Session> {
+    await db.read();
+
+    let session = Session.create(username);
+    do {
+        session = Session.create(username);
+    } while (db.data.sessions.find(ss => ss.id === session.id));
+
+    db.data.sessions.push(session);
+    
+    await db.write();
+
+    return session
+}
 
 const handlers: Record<string, Handler> = {
     "account/create": async (socket, data) => {
+        await db.read();
+
+        // Create Account
         const account = await Account.create({username: data.username, password: data.password, displayName: data.displayName});
-        accStore.add(account);
-        let session = sessionStore.create(account.username);
-        return { type: "account/creationSuccessful", data: { sessionID: session } };
+        db.data.accounts.push(account);
+
+        // Create Session
+
+        const session = await createSession(account.username);
+
+        return { type: "account/creationSuccessful", data: { sessionID: session.id } };
     },
 
     "account/login": async (socket, data) => {
-        const session = sessionStore.create(data.username);
-        return { type: "account/loginSuccessful", data: { sessionID: session } };
+        await db.read();
+        const account = db.data.accounts.find(acc => acc.username === data.username)
+
+        if(!account || !account.verifyPassword(data.password)) throw new Error("Invalid Username or Password");
+
+        const session = await createSession(account.username);
+
+        return { type: "account/loginSuccessful", data: { sessionID: session.id } };
     },
 
     // "guild/create": async (socket, data) => {
