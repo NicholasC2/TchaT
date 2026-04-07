@@ -1,0 +1,26 @@
+{
+  "accounts": [
+    {
+      "username": "nick",
+      "displayName": "NicholasC",
+      "pubKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs+hI0/rx0er9HAbSopfo5zhb/5Ej+XYUcoBJFYWzHMDbHsXriH4Ly2a6gsLc4N0ClGIEn9PGvEM0w1mRL0LFI+13Dp5j/WSsR8dHiB0nVai2Ut1LXKL7C6r30mFA//KAc2MszaB0CNbGhBEjbUSQC5aqUh5g9putzmljVh3TGcOw63k0k9UuV/wrsaI2N3dhTXFUEuFjMVLlHoraRYT0BREwzmPM7h9JqPa4MpcHo+hiX2rvrLgozrydftjjYrO/6gre/IBhbpFE+FaM0QNazyQIfPRFdBdPZ2fSea3IF4M1y5XK9DgnmSwGL44H+Uq7Cj3mdmvDFO9sJsF4AKA2vwIDAQAB"
+    },
+    {
+      "username": "nick",
+      "displayName": "NicholasC",
+      "pubKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA085o94aU28N95sIUknWEirr2Y6uqy+bJHdLGAfcGsjy9V0F3PlF3yF9ajhyxVC2VCSg8ZtLmtS4zsUNty/UhE56PmKTyqpWOktEOIwMnqwJ9WbUM/uBO9aUYWNZLLyJaco/2EkK6IPWmU8chGxehV6NaBwZX9HicSIHd4sXIUlm7SEwBNSqn9ofmGSADV1et+dqwbUMjtf6kZaNgy3lVZLSmaMoNa6m88Hd3TF7qKC1INoKgehBR5EHpcIcPw73RZR4rfypCFkRJQ67HBto5fzNpUDKU0A2uM1xtxzPmidHMEaXcXEQym98sXEUC3I6b72x/WK222eqPWLQDPS6inwIDAQAB"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "5bc3897f-043e-42a9-9b52-73d1bcd7af46",
+      "username": "nick",
+      "createdAt": 1775541713433
+    },
+    {
+      "id": "ee64d98c-da39-41d0-8189-080d0d779ebf",
+      "username": "nick",
+      "createdAt": 1775541879823
+    }
+  ]
+}

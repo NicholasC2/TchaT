@@ -1,10 +1,10 @@
-import { type PublicAccount } from "ts-accountd";
+import { Account } from "ts-accountd";
 
 export class Message {
     content: string;
-    author: PublicAccount;
+    author: Account;
 
-    constructor(content: string, author: PublicAccount) {
+    constructor(content: string, author: Account) {
         this.content = content;
         this.author = author;
     }

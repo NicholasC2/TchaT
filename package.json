@@ -12,7 +12,7 @@
     "dependencies": {
         "lowdb": "^7.0.1",
         "socket.io": "^4.7.5",
-        "ts-accountd": "file:ts-accountd"
+        "ts-accountd": "file:TS-Accountd"
     },
     "devDependencies": {
         "@types/node": "^20.11.0",

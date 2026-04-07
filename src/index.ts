@@ -1,10 +1,11 @@
 import { Server, Socket } from "socket.io"
-import { Account, Session } from "ts-accountd"
+import { Account, Session, AccountData } from "ts-accountd"
 import { Low } from "lowdb"
 import { JSONFile } from "lowdb/node"
+import { verify, randomBytes } from "node:crypto";
 
 type DBSchema = {
-    accounts: Account[]
+    accounts: AccountData[]
     sessions: Session[]
 }
 
@@ -31,7 +32,7 @@ async function createSession(username: string): Promise<Session> {
     let session = Session.create(username);
     do {
         session = Session.create(username);
-    } while (db.data.sessions.find(ss => ss.id === session.id));
+    } while (db.data.sessions.find(ss => ss.getId() === session.getId()));
 
     db.data.sessions.push(session);
     
@@ -40,31 +41,62 @@ async function createSession(username: string): Promise<Session> {
     return session
 }
 
+// account, value
+const loginValues = new Map<String, Buffer>();
+
 const handlers: Record<string, Handler> = {
     "account/create": async (socket, data) => {
         await db.read();
 
-        // Create Account
-        const account = await Account.create({username: data.username, password: data.password, displayName: data.displayName});
-        db.data.accounts.push(account);
+        const account = Account.create(data);
+        db.data.accounts.push(account.toJSON());
 
-        // Create Session
+        const session = Session.create(account.getUsername());
+        db.data.sessions.push(session);
 
-        const session = await createSession(account.username);
+        await db.write();
 
-        return { type: "account/creationSuccessful", data: { sessionID: session.id } };
+        return { type: "account/creationSuccessful", data: { sessionID: session.getId() } };
     },
 
     "account/login": async (socket, data) => {
         await db.read();
         const account = db.data.accounts.find(acc => acc.username === data.username)
 
-        if(!account || !account.verifyPassword(data.password)) throw new Error("Invalid Username or Password");
+        if(!account) throw new Error("Invalid username");
 
-        const session = await createSession(account.username);
+        const challenge = randomBytes(32);
+        loginValues.set(account.username, challenge);
 
-        return { type: "account/loginSuccessful", data: { sessionID: session.id } };
+        return { type: "account/challengeSend", data: { value: challenge.toString("base64") } };
     },
+
+    "account/challengeRecieve": async (socket, data) => {
+        if (typeof data.signature !== "string") throw new Error("Invalid signature format");
+
+        await db.read();
+        const account = db.data.accounts.find(acc => acc.username === data.username)
+
+        if(!account) throw new Error("Invalid username");
+
+        const accountObj = Account.fromJSON(account);
+
+        const challenge = loginValues.get(account.username);
+        if (!challenge) throw new Error("No challenge for this account");
+
+        const signature = Buffer.from(data.signature, "base64");
+
+        const verified = verify("sha256", challenge, accountObj.getPubKey(), signature);
+        if (!verified) throw new Error("Invalid signature");
+
+        loginValues.delete(accountObj.getUsername());
+
+        const session = Session.create(accountObj.getUsername());
+        db.data.sessions.push(session);
+        await db.write();
+
+        return { type: "account/loginSuccessful", data: { sessionID: session.getId() } };
+    }
 
     // "guild/create": async (socket, data) => {
     //     const guild = new Guild(data.name);
