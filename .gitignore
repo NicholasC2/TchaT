@@ -3,5 +3,4 @@ node_modules
 dist
 
 # server stuff
-accounts
-sessions
+db.json

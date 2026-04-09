@@ -41,12 +41,25 @@ async function createSession(username: string): Promise<Session> {
     return session
 }
 
-// account, value
-const loginValues = new Map<String, Buffer>();
+function toPEM(base64: string): string {
+    const lines = base64.match(/.{1,64}/g)?.join("\n");
+    return `-----BEGIN PUBLIC KEY-----\n${lines}\n-----END PUBLIC KEY-----`;
+}
+
+type LoginValue = {
+    challenge: Buffer;
+    timestamp: number;
+};
+
+const loginValues = new Map<String, LoginValue>();
 
 const handlers: Record<string, Handler> = {
     "account/create": async (socket, data) => {
         await db.read();
+
+        if(db.data.accounts.find(acc => acc.username === data.username)) {
+            throw new Error("Account already exists")
+        }
 
         const account = Account.create(data);
         db.data.accounts.push(account.toJSON());
@@ -66,7 +79,7 @@ const handlers: Record<string, Handler> = {
         if(!account) throw new Error("Invalid username");
 
         const challenge = randomBytes(32);
-        loginValues.set(account.username, challenge);
+        loginValues.set(account.username, {challenge: challenge, timestamp: Date.now()});
 
         return { type: "account/challengeSend", data: { value: challenge.toString("base64") } };
     },
@@ -81,13 +94,26 @@ const handlers: Record<string, Handler> = {
 
         const accountObj = Account.fromJSON(account);
 
-        const challenge = loginValues.get(account.username);
-        if (!challenge) throw new Error("No challenge for this account");
+        const loginvalue = loginValues.get(account.username);
+        if (!loginvalue) throw new Error("No challenge for this account");
 
-        const signature = Buffer.from(data.signature, "base64");
+        if(Date.now() - loginvalue.timestamp > 60000) {
+            loginValues.delete(accountObj.getUsername())
+            throw new Error("Challenge timed out")
+        }
 
-        const verified = verify("sha256", challenge, accountObj.getPubKey(), signature);
-        if (!verified) throw new Error("Invalid signature");
+        const isValid = verify(
+            "RSA-SHA256",
+            Buffer.from(loginvalue.challenge),
+            toPEM(account.pubKey),
+            Buffer.from(data.signature, "base64")
+        );
+
+        console.log(toPEM(account.pubKey));
+        console.log(data.signature);
+        console.log(loginvalue.challenge);
+        
+        if (!isValid) throw new Error("Invalid signature");
 
         loginValues.delete(accountObj.getUsername());
 
