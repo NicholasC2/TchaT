@@ -1,22 +1,31 @@
 import { Server, Socket } from "socket.io"
-import { Account, Session, AccountData } from "ts-accountd"
+import { Account, Session } from "ts-accountd"
 import { Low } from "lowdb"
 import { JSONFile } from "lowdb/node"
 import { verify, randomBytes } from "node:crypto";
 
+type AccountStored = {
+    username: string;
+    pubKey: string;
+    displayName: string;
+    messages?: { [key: string]: string[] };
+}
+
+type SessionStored = {
+    id: string;
+    username: string;
+    createdAt: number;
+}
+
 type DBSchema = {
-    accounts: AccountData[]
-    sessions: Session[]
+    accounts: AccountStored[]
+    sessions: SessionStored[]
 }
 
 const adapter = new JSONFile<DBSchema>("db.json")
 const db = new Low(adapter, { accounts: [], sessions: [] });
 
-type ServerMessage =
-    | { type: "account/creationSuccessful"; data: { sessionID: string } }
-    | { type: "account/loginSuccessful"; data: { sessionID: string } }
-    | { type: "error"; data: { message: string } }
-    | { type: string; data: any };
+type ServerMessage = { type: string; data: any };
 
 type Handler = (socket: Socket, data: any) => Promise<ServerMessage>;
 
@@ -32,9 +41,9 @@ async function createSession(username: string): Promise<Session> {
     let session = Session.create(username);
     do {
         session = Session.create(username);
-    } while (db.data.sessions.find(ss => ss.getId() === session.getId()));
+    } while (db.data.sessions.find(ss => ss.id === session.getId()));
 
-    db.data.sessions.push(session);
+    db.data.sessions.push(session.toJSON());
     
     await db.write();
 
@@ -65,7 +74,7 @@ const handlers: Record<string, Handler> = {
         db.data.accounts.push(account.toJSON());
 
         const session = Session.create(account.getUsername());
-        db.data.sessions.push(session);
+        db.data.sessions.push(session.toJSON());
 
         await db.write();
 
@@ -114,46 +123,36 @@ const handlers: Record<string, Handler> = {
         loginValues.delete(accountObj.getUsername());
 
         const session = Session.create(accountObj.getUsername());
-        db.data.sessions.push(session);
+        db.data.sessions.push(session.toJSON());
         await db.write();
 
         return { type: "account/loginSuccessful", data: { sessionID: session.getId() } };
+    },
+
+    "user/sendMessage": async (socket, data) => {
+        await db.read();
+        const session = db.data.sessions.find(session => session.id === data.sessionID)
+
+        if(!session) throw new Error("Invalid session");
+        if(Date.now() - session.createdAt > 86400000 * 10) {
+            throw new Error("Session timed out, please login again")
+        }
+
+        const sendingAccount = db.data.accounts.find(account => account.username === session.username);
+        if(!sendingAccount) throw new Error("Invalid account");
+        
+        const recievingAccount = db.data.accounts.find(account => account.username === data.username);
+        if(!recievingAccount) throw new Error("Invalid Reciving account");
+
+        if(!sendingAccount.messages) sendingAccount.messages = {};
+        if(!sendingAccount.messages[recievingAccount.username]) sendingAccount.messages[recievingAccount.username] = [];
+
+        sendingAccount.messages[recievingAccount.username].push(data.content)
+
+        await db.write();
+
+        return { type: "user/sendMessageSuccessful", data: {} };
     }
-
-    // "guild/create": async (socket, data) => {
-    //     const guild = new Guild(data.name);
-
-    //     if (!guild) throw new Error("Guild Invalid");
-
-    //     return { type: "guild/creationSuccessful", data: guild.serialize() };
-    // },
-
-    // "channel/get": async (socket, data) => {
-    //     const guild = getGuild(data.guildID);
-    //     const channel = guild?.channels.find(c => c.id === data.channelID);
-
-    //     if (!channel) throw new Error("Channel Not Found");
-
-    //     return { type: "channel/getSuccessful", data: channel?.serialize() };
-    // },
-
-    // "channel/sendMessage": async (socket, data) => {
-    //     const guild = getGuild(data.guildID);
-    //     const channel = guild?.channels.find(c => c.id === data.channelID);
-
-    //     const session = sessionStore.get(data.sessionID);
-    //     if(!session) throw new Error("Invalid SessionID");
-    //     const account = accStore.get(session.username);
-
-    //     const msg = channel?.createMessage(
-    //         data.content,
-    //         account?.getPublicAccount()
-    //     );
-
-    //     if (!msg) throw new Error("Message Invalid");
-
-    //     return { type: "channel/sendMessageSuccessful", data: msg?.serialize() };
-    // }
 };
 
 server.on("connection", socket => {
