@@ -108,10 +108,6 @@ const handlers: Record<string, Handler> = {
             toPEM(account.pubKey),
             Buffer.from(data.signature, "base64")
         );
-
-        console.log(toPEM(account.pubKey));
-        console.log(data.signature);
-        console.log(loginvalue.challenge);
         
         if (!isValid) throw new Error("Invalid signature");
 
