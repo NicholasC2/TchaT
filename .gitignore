@@ -1,6 +1,6 @@
 # node stuff
-node_modules
 dist
+node_modules
 
 # server stuff
 db.json
