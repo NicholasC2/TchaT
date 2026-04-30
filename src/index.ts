@@ -1,4 +1,3 @@
-import { Account, Session } from "ts-accountd"
 import { Config, defaultConfig } from "./config.js"
 import { WebSocketServer } from "ws"
 
@@ -22,8 +21,12 @@ server.on("listening", ()=>{
     console.log(`Server listening on port ${config.getPort()}`)
 })
 
-server.on("connection", (socket)=>{
-    let heartbeatTime = Date.now()
+server.on("connection", (socket, req)=>{
+    const timestamp = Date.now();
+
+    console.log(`Client Connected: ${req.socket.remoteAddress}`)
+
+    let heartbeatTime = timestamp
 
     socket.on("message", (rawMessage)=>{
         const parsed = JSON.parse(rawMessage.toString());
@@ -34,13 +37,18 @@ server.on("connection", (socket)=>{
         if(type !instanceof Number) throw new Error();
 
         if(type == Message_Type.HEARTBEAT) {
-            heartbeatTime = Date.now();
+            heartbeatTime = timestamp
         }
     })
 
-    setInterval(()=>{
-        if(heartbeatTime + 30000 < Date.now()) {
+    const interval = setInterval(()=>{
+        if(heartbeatTime + 30000 < timestamp) {
             socket.close(Socket_Close_Reason.HEARTBEAT_TIMEOUT);
         }
     }, 5000)
+
+    socket.on("close", ()=>{
+        clearInterval(interval);
+        console.log(`Client Disconnected: ${req.socket.remoteAddress}`)
+    })
 })
