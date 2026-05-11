@@ -1,5 +1,8 @@
 export enum Message_Type {
-    HEARTBEAT
+    NONE,
+
+    CREATE_ACCOUNT,
+    DELETE_ACCOUNT
 }
 
 export const Socket_Close_Reason = {

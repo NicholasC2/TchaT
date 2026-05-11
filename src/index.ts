@@ -1,7 +1,23 @@
 import { Config, defaultConfig } from "./config.js"
 import { WebSocketServer } from "ws"
 
-import { Message_Type, Socket_Close_Reason } from "./message_helper.js"
+import { User, Profile } from "./user.js"
+import { Message_Type, Socket_Close_Reason } from "./TchaT-common.js"
+
+import pg from "pg"
+import dotenv from "dotenv"
+
+dotenv.config();
+
+const { Pool } = pg;
+
+const db = new Pool({
+    connectionString: process.env.DATABASE_URL
+})
+
+const result = await db.query("SELECT NOW()");
+
+console.log(result.rows);
 
 console.log("Starting TchaT server...")
 
@@ -35,9 +51,22 @@ server.on("connection", (socket, req)=>{
         const data = parsed.d;
 
         if(type !instanceof Number) throw new Error();
+        
+        heartbeatTime = timestamp
 
-        if(type == Message_Type.HEARTBEAT) {
-            heartbeatTime = timestamp
+        switch(type) {
+            case Message_Type.NONE: {
+                break;
+            }
+
+            case Message_Type.CREATE_ACCOUNT: {
+                const { username, publicKey, profileInfo } = data;
+                const { displayName, profileImageURL, bio } = profileInfo
+
+                const newUser = new User(new Profile(displayName, profileImageURL, bio), username, publicKey);
+
+                
+            }
         }
     })
 
