@@ -3,4 +3,4 @@ dist
 node_modules
 
 # server stuff
-db.json
+*.db

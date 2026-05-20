@@ -4,22 +4,47 @@ import { WebSocketServer } from "ws"
 import { User, Profile } from "./user.js"
 import { Message_Type, Socket_Close_Reason } from "./TchaT-common.js"
 
-import pg from "pg"
 import dotenv from "dotenv"
+import Database from "better-sqlite3";
 
 dotenv.config();
 
-const { Pool } = pg;
+console.log("Starting TchaT server...");
 
-const db = new Pool({
-    connectionString: process.env.DATABASE_URL
-})
+console.log("Initializing DB...");
+const db = new Database("tchat.db");
 
-const result = await db.query("SELECT NOW()");
+db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY,
+        public_key TEXT NOT NULL,
+        display_name TEXT,
+        profile_image_url TEXT,
+        bio TEXT
+    );
 
-console.log(result.rows);
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        author TEXT NOT NULL,
+        encrypted_content TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
 
-console.log("Starting TchaT server...")
+        FOREIGN KEY(author) REFERENCES users(username)
+    );
+
+    CREATE TABLE IF NOT EXISTS message_keys (
+        message_id INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        encrypted_key TEXT NOT NULL,
+
+        PRIMARY KEY(message_id, username),
+
+        FOREIGN KEY(message_id) REFERENCES messages(id),
+        FOREIGN KEY(username) REFERENCES users(username)
+    );
+`); // create users and messages table if it does not exist
+
+console.log(db)
 
 let config = defaultConfig;
 
