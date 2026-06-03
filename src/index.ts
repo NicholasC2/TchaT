@@ -2,7 +2,7 @@ import { Config, defaultConfig } from "./config.js"
 import { WebSocketServer } from "ws"
 
 import { User, Profile } from "./user.js"
-import { Message_Type, Socket_Close_Reason } from "./TchaT-common.js"
+import { Message_Type, Socket_Close_Reason } from "./messageTypes.js"
 
 import dotenv from "dotenv"
 import Database from "better-sqlite3";
@@ -59,7 +59,7 @@ const server = new WebSocketServer({
 })
 
 server.on("listening", ()=>{
-    console.log(`Server listening on port ${config.getPort()}`)
+    console.log(`Server running at ws://localhost:${config.getPort()}`)
 })
 
 server.on("connection", (socket, req)=>{
@@ -93,6 +93,8 @@ server.on("connection", (socket, req)=>{
                 
             }
         }
+
+        console.log(parsed);
     })
 
     const interval = setInterval(()=>{
