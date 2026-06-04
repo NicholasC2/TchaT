@@ -2,26 +2,15 @@
     "name": "tchat",
     "version": "1.0.0",
     "description": "",
-    "main": "dist/index.js",
+    "main": "src/index.js",
     "type": "module",
     "scripts": {
-        "build": "tsc",
-        "start": "node dist/index.js",
-        "dev": "nodemon --watch src --ext ts --exec \"npx tsc && node dist/index.js\""
+        "dev": "node --watch src/index.js"
     },
     "dependencies": {
-        "@types/node": "^25.6.0",
-        "@types/ws": "^8.18.1",
-        "better-sqlite3": "^12.10.0",
-        "dotenv": "^17.4.2",
-        "pg": "^8.20.0",
-        "ts-accountd": "file:./TS-Accountd",
-        "ws": "^8.20.0"
-    },
-    "devDependencies": {
-        "@types/better-sqlite3": "^7.6.13",
-        "@types/pg": "^8.20.0",
-        "nodemon": "^3.1.14",
-        "typescript": "^5.4.0"
+        "@libsql/sqlite3": "^0.3.1",
+        "sql.js": "^1.14.1",
+        "sqlite3": "^6.0.1",
+        "ws": "^8.21.0"
     }
 }
